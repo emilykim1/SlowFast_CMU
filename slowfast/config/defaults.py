@@ -469,6 +469,12 @@ _C.DATA.TRAIN_CROP_SIZE = 224
 # The spatial crop size for testing.
 _C.DATA.TEST_CROP_SIZE = 256
 
+# Color Jitter true false
+_C.DATA.COLOR_JITTER = False
+
+# Gaussian Blur true false
+_C.DATA.GAUSSIAN_BLUR = False
+
 # Input videos may has different fps, convert it to the target video fps before
 # frame sampling.
 _C.DATA.TARGET_FPS = 30
@@ -493,6 +499,14 @@ _C.DATA.ENSEMBLE_METHOD = "sum"
 # If True, revert the default input channel (RBG <-> BGR).
 _C.DATA.REVERSE_INPUT_CHANNEL = False
 
+# Majority labeling
+_C.DATA.MAJORITY_LABELING = False
+
+# Spatial Sampling
+_C.DATA.SPATIAL_SAMPLING = False
+
+# Sharpening
+_C.DATA.ADJUST_SHARPNESS = False
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options
@@ -938,6 +952,10 @@ _C.DEMO.SLOWMO = 1
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
 
+# GAO: 20211208 add fine tune mode
+_C.FINE_TUNE_MODE = 0
+# GAO: 20211216 add class weight 
+_C.CLASS_WEIGHT = None
 
 def assert_and_infer_cfg(cfg):
     # BN assertions.

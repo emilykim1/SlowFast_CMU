@@ -10,6 +10,7 @@ import cv2
 import torch
 from torch.utils.data.distributed import DistributedSampler
 
+
 from slowfast.utils.env import pathmgr
 
 from . import transform as transform
@@ -178,6 +179,7 @@ def spatial_sampling(
             frames, min_scale, max_scale
         )
         frames, _ = transform.uniform_crop(frames, crop_size, spatial_idx)
+    
     return frames
 
 
@@ -334,6 +336,7 @@ def create_sampler(dataset, shuffle, cfg):
     Returns:
         sampler (Sampler): the created sampler.
     """
+
     sampler = DistributedSampler(dataset) if cfg.NUM_GPUS > 1 else None
 
     return sampler

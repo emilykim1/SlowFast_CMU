@@ -263,7 +263,7 @@ def add_confusion_matrix(
         # If subset is not provided, take every classes.
         if subset_ids is None:
             subset_ids = list(range(num_classes))
-
+            
         sub_cmtx = cmtx[subset_ids, :][:, subset_ids]
         sub_names = [class_names[j] for j in subset_ids]
 

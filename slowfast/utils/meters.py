@@ -309,11 +309,16 @@ class TestMeter(object):
         """
         for ind in range(preds.shape[0]):
             vid_id = int(clip_ids[ind]) // self.num_clips
-            if self.video_labels[vid_id].sum() > 0:
-                assert torch.equal(
-                    self.video_labels[vid_id].type(torch.FloatTensor),
-                    labels[ind].type(torch.FloatTensor),
-                )
+            # print(self.num_clips)
+            # print(self.video_labels[vid_id].sum())
+            # print(self.multi_label)
+            # print('meters',self.video_labels[vid_id])
+            # print('meters',labels[ind])
+            # if self.video_labels[vid_id].sum() > 0:
+            #     assert torch.equal(
+            #         self.video_labels[vid_id].type(torch.FloatTensor),
+            #         labels[ind].type(torch.FloatTensor),
+            #     )
             self.video_labels[vid_id] = labels[ind]
             if self.ensemble_method == "sum":
                 self.video_preds[vid_id] += preds[ind]

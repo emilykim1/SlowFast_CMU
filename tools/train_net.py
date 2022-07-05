@@ -5,6 +5,8 @@
 
 import numpy as np
 import pprint
+import os
+import pickle
 import torch
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 
@@ -15,6 +17,7 @@ import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import slowfast.utils.metrics as metrics
 import slowfast.utils.misc as misc
+from slowfast.utils.env import pathmgr
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.datasets.mixup import MixUp
@@ -96,11 +99,11 @@ def train_epoch(
                 preds = model(inputs)
             # Explicitly declare reduction to mean.
             loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(
+#                 weight = torch.tensor(cfg.CLASS_WEIGHT).cuda(non_blocking=True),
                 reduction="mean"
             )
-
-            # Compute the loss.
-            loss = loss_fun(preds, labels)
+#             print(preds, labels)
+            loss = loss_fun(preds, labels.flatten())
 
         # check Nan Loss.
         misc.check_nan_losses(loss)
@@ -157,10 +160,20 @@ def train_epoch(
                 loss = loss.item()
             else:
                 # Compute the errors.
-                num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                # num_topks_correct = [torch.zeros(1).cuda(), torch.zeros(1).cuda()] 
+                # for i in range(8):
+                #     num_topks_correct_i = metrics.topks_correct(preds[:, i], labels[:,i], (1,5))
+                #     for j in range(2):
+                #         num_topks_correct[j] += num_topks_correct_i[j]/8
+                num_topks_correct = metrics.topks_correct(preds, labels, (1,5))
+
+                # Combine the errors across the GPUs.
                 top1_err, top5_err = [
-                    (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                    (1.0 - x / (preds.size(0))) * 100.0 for x in num_topks_correct
                 ]
+                # top1_err, top5_err = [
+                #     (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                # ]
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, top1_err, top5_err = du.all_reduce(
@@ -225,6 +238,11 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
     model.eval()
     val_meter.iter_tic()
 
+    val_epoch_err = []
+    num_val = []
+    
+    tot = 0
+
     for cur_iter, (inputs, labels, _, meta) in enumerate(val_loader):
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
@@ -261,6 +279,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
             val_meter.iter_toc()
             # Update and log stats.
             val_meter.update_stats(preds, ori_boxes, metadata)
+        
 
         else:
             preds = model(inputs)
@@ -270,14 +289,25 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
                     preds, labels = du.all_gather([preds, labels])
             else:
                 # Compute the errors.
-                num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                # preds = preds.reshape((preds.shape[0], 8 , 8))
+                # num_topks_correct = [torch.zeros(1).cuda(), torch.zeros(1).cuda()] 
+                # for i in range(8):
+                #     num_topks_correct_i = metrics.topks_correct(preds[:, i], labels[:,i], (1,5))
+                #     for j in range(2):
+                #         num_topks_correct[j] += num_topks_correct_i[j]/8
+                num_topks_correct = metrics.topks_correct(preds, labels, (1,5))
 
                 # Combine the errors across the GPUs.
                 top1_err, top5_err = [
-                    (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                    (1.0 - x / (preds.size(0))) * 100.0 for x in num_topks_correct
                 ]
+
+                # top1_err, top5_err = [
+                #     (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
+                # ]
                 if cfg.NUM_GPUS > 1:
                     top1_err, top5_err = du.all_reduce([top1_err, top5_err])
+                    preds, labels = du.all_gather([preds, labels])
 
                 # Copy the errors from GPU to CPU (sync point).
                 top1_err, top5_err = top1_err.item(), top5_err.item()
@@ -298,11 +328,17 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
                         {"Val/Top1_err": top1_err, "Val/Top5_err": top5_err},
                         global_step=len(val_loader) * cur_epoch + cur_iter,
                     )
+                val_epoch_err.append(top1_err)
+                num_val.append(len(preds))
 
             val_meter.update_predictions(preds, labels)
-
+            
         val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
+
+    val_avg_top1_err = np.sum((val_epoch_err[i] * num_val[i] for i in range(len(val_epoch_err)))) / np.sum(num_val)
+    if writer is not None:
+        writer.add_scalars({"Val/Avg_top1_err" : val_avg_top1_err}, global_step = cur_epoch)
 
     # Log epoch stats.
     val_meter.log_epoch_stats(cur_epoch)
@@ -320,9 +356,20 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
             if cfg.NUM_GPUS:
                 all_preds = [pred.cpu() for pred in all_preds]
                 all_labels = [label.cpu() for label in all_labels]
+
             writer.plot_eval(
                 preds=all_preds, labels=all_labels, global_step=cur_epoch
             )
+            if cfg.TEST.SAVE_RESULTS_PATH != "":
+                save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
+
+                if du.is_root_proc():
+                    with pathmgr.open(save_path, "wb") as f:
+                        pickle.dump([all_preds, all_labels], f)
+
+                logger.info(
+                    "Successfully saved prediction results to {}".format(save_path)
+                )
 
     val_meter.reset()
 
@@ -469,6 +516,8 @@ def train(cfg):
 
     epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
+        # eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer)
+        # break
         if cfg.MULTIGRID.LONG_CYCLE:
             cfg, changed = multigrid.update_long_cycle(cfg, cur_epoch)
             if changed:
@@ -527,9 +576,10 @@ def train(cfg):
             cur_epoch,
             None if multigrid is None else multigrid.schedule,
         )
-        is_eval_epoch = misc.is_eval_epoch(
-            cfg, cur_epoch, None if multigrid is None else multigrid.schedule
-        )
+        # is_eval_epoch = misc.is_eval_epoch(
+        #     cfg, cur_epoch, None if multigrid is None else multigrid.schedule
+        # )
+        is_eval_epoch = True
 
         # Compute precise BN stats.
         if (

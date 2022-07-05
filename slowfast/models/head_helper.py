@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-
 """ResNe(X)t Head helper."""
 
 import torch
@@ -28,7 +25,6 @@ class ResNetRoIHead(nn.Module):
         The `__init__` method of any subclass should also contain these
             arguments.
         ResNetRoIHead takes p pathways as input where p in [1, infty].
-
         Args:
             dim_in (list): the list of channel dimensions of the p inputs to the
                 ResNetHead.
@@ -151,7 +147,6 @@ class ResNetBasicHead(nn.Module):
         The `__init__` method of any subclass should also contain these
             arguments.
         ResNetBasicHead takes p pathways as input where p in [1, infty].
-
         Args:
             dim_in (list): the list of channel dimensions of the p inputs to the
                 ResNetHead.
@@ -248,7 +243,6 @@ class X3DHead(nn.Module):
         The `__init__` method of any subclass should also contain these
             arguments.
         X3DHead takes a 5-dim feature tensor (BxCxTxHxW) as input.
-
         Args:
             dim_in (float): the channel dimension C of the input.
             num_classes (int): the channel dimensions of the output.
