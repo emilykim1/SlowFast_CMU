@@ -1,0 +1,15 @@
+*.ipynb*
+*
+!/**/
+!*.*
+*log/*
+detectron*
+pretrained_pkl/*
+dataset/*
+checkpoints/*
+checkpoints/
+dataset/
+*.ipython*
+*stdout*
+*.log
+*checkpoint_*
