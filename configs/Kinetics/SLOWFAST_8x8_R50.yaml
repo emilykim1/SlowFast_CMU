@@ -7,7 +7,6 @@ TRAIN:
   AUTO_RESUME: True
   CHECKPOINT_TYPE: caffe2
   CHECKPOINT_FILE_PATH: "pretrained_pkl/SLOWFAST_8x8_R50.pkl"
-  # CHECKPOINT_FILE_PATH: "checkpoints/checkpoint_epoch_00274.pyth"
 DATA:
   NUM_FRAMES: 32
   SAMPLING_RATE: 2
@@ -64,10 +63,9 @@ MODEL:
   LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.5
 TEST:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
   BATCH_SIZE: 64
-  CHECKPOINT_FILE_PATH: "checkpoints/checkpoint_epoch_00660.pyth"
 DATA_LOADER:
   NUM_WORKERS: 0
   PIN_MEMORY: True

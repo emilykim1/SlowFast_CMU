@@ -328,7 +328,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
         val_meter.iter_tic()
 
     val_avg_top1_err = np.sum((val_epoch_err[i] * num_val[i] for i in range(len(val_epoch_err)))) / np.sum(num_val)
-    
+
     if writer is not None:
         writer.add_scalars({"Val/Avg_top1_err" : val_avg_top1_err}, global_step = cur_epoch)
 
