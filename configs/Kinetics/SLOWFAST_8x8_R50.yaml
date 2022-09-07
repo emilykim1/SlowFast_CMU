@@ -1,5 +1,5 @@
 TRAIN:
-  ENABLE: False
+  ENABLE: True
   DATASET: kinetics
   BATCH_SIZE: 28
   EVAL_PERIOD: 10
@@ -66,6 +66,7 @@ TEST:
   ENABLE: False
   DATASET: kinetics
   BATCH_SIZE: 64
+  CHECKPOINT_FILE_PATH: "checkpoints/checkpoint_epoch_00081.pyth"
 DATA_LOADER:
   NUM_WORKERS: 0
   PIN_MEMORY: True

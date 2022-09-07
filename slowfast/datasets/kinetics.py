@@ -18,6 +18,7 @@ from .build import DATASET_REGISTRY
 from .random_erasing import RandomErasing
 from .transform import create_random_augment
 import torchvision.transforms as tt
+from collections import Counter
 # import torchvision.transforms.ToPILImage as ToPILImage
 # import torchvision.transforms.ToTensor as ToTensor
 
@@ -151,7 +152,7 @@ class Kinetics(torch.utils.data.Dataset):
 
             if temporal_sample_index == -1:
                 count = 0
-                while count < 0.8*64:
+                while count < 0.8*8:
                     start = int(random.uniform(0, delta))
                     seq = list(range(start, start + num_frames * sampling_rate))
                     # seq_sampled = seq[::2] GAO, 20220111
@@ -169,14 +170,33 @@ class Kinetics(torch.utils.data.Dataset):
 
                     fmt_str = "<{}i".format(frame_count)
                     labels = list(
-                        struct.unpack(fmt_str, open(os.path.join(self._path_to_videos[index], "label.bin"), "rb").read())
-                    )
-                    
-                    ids = dict(zip(*np.unique(labels[seq[0]:seq[-1]], return_counts=True)))
-                    mf = list(ids)[-1]
-                    count = ids[mf]
+                        struct.unpack(fmt_str, open(os.path.join(self._path_to_videos[index], "label.bin"), "rb").read()))
 
-                frame_labels = torch.as_tensor([mf])
+                    # ids = dict(zip(*np.unique(labels[seq[0]:seq[-1]], return_counts=True)))
+                    # mf = list(ids)[-1]
+                    # count = ids[mf]
+                    if self.cfg.DATA.MAJORITY_LABELING:
+                        frame_labels = []
+                        for i in seq[::8]:
+                            counter = [0 for i in range(8)]
+                            for j in range(8):
+                                index = i + j 
+                                lab = labels[index]
+                                counter[lab] += i
+
+                            label = np.argmax(counter)
+                            frame_labels += [label]
+                        frame_labels = torch.as_tensor(frame_labels)
+                    else:
+                        frame_labels = torch.as_tensor(list(labels[i] for i in seq[::8]))
+                    print(frame_labels)
+                    counter = Counter(frame_labels.tolist())
+                    mf = counter.most_common(2)
+                    count = frame_labels.tolist().count(mf[0][0])
+                    print(mf[0][0])
+                    print(count)
+                frame_labels = torch.as_tensor([mf[0][0]])
+                # frame_labels = torch.as_tensor([mf])
                 
         if self.mode in ["val","test"]:
             # GAO: for eval, not num of frames, but start frame number
